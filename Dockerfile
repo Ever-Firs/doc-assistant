@@ -1,27 +1,18 @@
-FROM python:3.11-slim
+from python:3.11-slim
 
-# Устанавливаем системные зависимости для компиляции (нужны для faiss / numpy)
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
+run apt-get update && apt-get install -y --no-install-recommend \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
+workdir /app
 
-WORKDIR /app 
+env HF_HOME=/app/cache/huggingface \
+    PYTHONPATH=/app \
+    PYTHONBUFFERED=1
 
-# Перенаправляем кэш Huggin Face в отдельную папку, чтобы сохранить модели на хосте
+copy rq.in
+run pip install --no-cache-dir -r rq.in
+copy src/ ./src/
+copy .env .
+expose 8000
 
-ENV HF_HOME=/app/cache/hugginface \
-    PYTHONPATH=/app\
-    PYTHONUNBUFERED=1
-
-COPY requirements.txt .
-
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY src/ ./src/
-COPY .env .
-
-ENV PYTHONPATH=/app
-EXPOSE 8000
-
-CMD ["uvicorn", "src.app:app"]"]
+cmd ["uvicorn","src.app:app","--host","0.0.0.0","--port","8000"]

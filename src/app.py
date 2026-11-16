@@ -11,8 +11,7 @@ index_state = None
 async def lifespan(app: FastAPI):
     global index_state
     print("=== Загрузка RAG-системы ===")
-    
-    index_state = load_rag_assets() # Строим/загружаем индекс один раз при старте сервера
+    index_state = load_rag_assets()  # Строим/загружаем индекс один раз при старте сервера
     print("=== Система успешно загружена и готова к запросам ===")
     yield
     print("=== Остановка сервера ===")
@@ -32,18 +31,18 @@ def health():
 @app.post("/ask")
 def ask(q: Query):
     """Точка входа для RAG вопросов"""
-    # Обязательная проверка для обработки ошибок (пустой вопрос)
+    # Обязательная обвязка для обработки ошибок (пустой вопрос)
     if not q.question.strip():
         raise HTTPException(status_code=400, detail="Пустой вопрос")
-        
+
     # Замеряем время ответа, чтобы проанализировать производительность CPU
     start_time = time.time()
-    
+
     answer, sources = rag_answer(q.question, index_state, k=q.k)
-    
+
     elapsed_time = time.time() - start_time
-    print(f"Запрос обработан за {elapsed_time:.4f} сек.") # Логирование в консоль
-    
+    print(f"Запрос обработан за {elapsed_time:.4f} сек.")  # Логирование в консоль
+
     return {
         "answer": answer,
         "sources": sources,

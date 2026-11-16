@@ -1,0 +1,154 @@
+#include <iostream>
+#include <cmath>
+#include <vector>
+#include <iomanip>
+#include <functional>
+#include <initializer_list>
+#include <utility>
+using namespace std;
+
+class Point {
+private:
+    vector<double> coords;
+
+public:
+    Point(initializer_list<double> init) : coords(init) {}
+    Point(vector<double> c) : coords(c) {}
+    Point() {}
+
+    double& operator[](size_t i) { return coords[i]; }
+    const double& operator[](size_t i) const { return coords[i]; }
+
+    size_t size() const { return coords.size(); }
+    Point operator+(const Point& other) const {
+        Point res = *this;
+        for (size_t i = 0; i < coords.size(); ++i) res.coords[i] += other.coords[i];
+        return res;
+    }
+    Point operator-(const Point& other) const {
+        Point res = *this;
+        for (size_t i = 0; i < coords.size(); ++i) res.coords[i] -= other.coords[i];
+        return res;
+    }
+    Point operator*(double scalar) const {
+        Point res = *this;
+        for (size_t i = 0; i < coords.size(); ++i) res.coords[i] *= scalar;
+        return res;
+    }
+    double norm() const {
+        double sum = 0.0;
+        for (double c : coords) sum += c * c;
+        return sqrt(sum);
+    }
+};
+
+Point operator*(double scalar, const Point& p) { return p * scalar; }
+
+ostream& operator<<(ostream& os, const Point& p) {
+    os << "(";
+    for (size_t i = 0; i < p.size(); ++i) {
+        os << p[i];
+        if (i < p.size() - 1) os << ", ";
+    }
+    return os << ")";
+}
+
+double f(const Point& p) {
+    double x1 = p[0], x2 = p[1];
+    return exp(x1*x1 + 2*x1) + (x1 + x2)*(x1 + x2) + exp(x2*x2 - 5*x2);
+}
+
+Point grad_f(const Point& p) { 
+    double x1 = p[0], x2 = p[1];
+    double g1 = (2*x1 + 2) * exp(x1*x1 + 2*x1) + 2*(x1 + x2);
+    double g2 = 2*(x1 + x2) + (2*x2 - 5) * exp(x2*x2 - 5*x2);
+    return {g1, g2};
+}
+
+double golden_section(function<double(double)> F, double a, double b, double tol = 1e-5) {
+    const double phi = (sqrt(5.0) - 1.0) / 2.0;
+    double x1 = b - phi*(b - a), x2 = a + phi*(b - a);
+    double f1 = F(x1), f2 = F(x2);
+    while (b - a > tol) {
+        if (f1 < f2) { b = x2; x2 = x1; f2 = f1; x1 = b - phi*(b - a); f1 = F(x1); }
+        else         { a = x1; x1 = x2; f1 = f2; x2 = a + phi*(b - a); f2 = F(x2); }
+    }
+    return (a + b) / 2;
+}
+
+double armijo_step(const Point& p, const Point& grad, double alpha_init, double gamma, double theta) {
+    double alpha = alpha_init;
+    double fc = f(p);
+    double g2 = grad.norm() * grad.norm();
+    Point p_new = p + grad * (-alpha);
+    
+    while (f(p_new) > fc - gamma * alpha * g2) {
+        alpha *= theta;
+        p_new = p + grad * (-alpha);
+    }
+    return alpha;
+}
+
+pair<Point, int> gradient_armijo(const Point& p0, double eps, double alpha_init, double gamma, double theta) {
+    Point p = p0;
+    int k = 0;
+    while (grad_f(p).norm() > eps) {
+        Point g = grad_f(p);
+        double alpha = armijo_step(p, g, alpha_init, gamma, theta);
+        p = p + g * (-alpha);
+        k++;
+    }
+    return {p, k};
+}
+
+pair<Point, int> gradient_steepest(const Point& p0, double eps, double amax) {
+    Point p = p0;
+    int k = 0;
+    while (grad_f(p).norm() > eps) {
+        Point g = grad_f(p);
+        auto F = [&](double alpha) { return f(p + g * (-alpha)); };
+        double alpha = golden_section(F, 0.0, amax);
+        p = p + g * (-alpha);
+        k++;
+    }
+    return {p, k};
+}
+
+int main() {
+    cout << fixed << setprecision(4);
+    Point x0 = {0.0, 1.0}; 
+    double eps = 0.01;     
+
+    auto result_arm = gradient_armijo(x0, eps, 1.0, 0.1, 0.5);
+    cout << "Метод Армихо\n";
+    cout << "Точка минимума: x* = " << result_arm.first << "\n";
+    cout << "Значение f(x*): " << f(result_arm.first) << "\n";
+    cout << "Итераций: " << result_arm.second << "\n\n";
+
+    auto result_steep = gradient_steepest(x0, eps, 2.0);
+    cout << "Метод наискорейшего спуска\n";
+    cout << "Точка минимума: x* = " << result_steep.first << "\n";
+    cout << "Значение f(x*): " << f(result_steep.first) << "\n";
+    cout << "Итераций: " << result_steep.second << "\n\n";
+
+    cout << "Анализ параметров (Метод Армихо)\n";
+    cout << "Влияние alpha (gamma=0.1, theta=0.5):\n";
+    for (double a : {0.1, 0.5, 1.0, 2.0}) {
+        auto res = gradient_armijo(x0, eps, a, 0.1, 0.5);
+        cout << "  alpha = " << setw(4) << a << " -> " << res.second << " итераций\n";
+    }
+
+    cout << "Влияние gamma (alpha=1.0, theta=0.5):\n";
+    for (double g : {0.01, 0.1, 0.5, 0.9}) {
+        auto res = gradient_armijo(x0, eps, 1.0, g, 0.5);
+        cout << "  gamma = " << setw(4) << g << " -> " << res.second << " итераций\n";
+    }
+
+    cout << "Влияние theta (alpha=1.0, gamma=0.1):\n";
+    for (double t : {0.1, 0.5, 0.8}) {
+        auto res = gradient_armijo(x0, eps, 1.0, 0.1, t);
+        cout << "  theta = " << setw(4) << t << " -> " << res.second << " итераций\n";
+    }
+
+    return 0;
+}
