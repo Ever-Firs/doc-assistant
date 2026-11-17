@@ -147,7 +147,7 @@ def trein_and_log(lr, epoch, batch_size=32):
         mlflow.log_param("in_features", in_features)
 
         mlflow.set_tag("model_type", "TF-IDF + PyTorch NN")
-        mlflow.set_tag ("autor", "Тудачков Т.Р")
+        mlflow.set_tag ("autor", "Валеев В.К.")
 
         best_test_loss =float('inf')
         final_test_acc = 0.0
